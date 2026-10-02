@@ -1,0 +1,30 @@
+# Server (Hetzner, Traefik arxasında): docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
+# Proqram yalnız https://${APP_HOST} ünvanında açılır; baza və backend xaricə açılmır.
+services:
+  frontend:
+    ports: !reset []
+    networks:
+      - default
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.sade-http.entrypoints=http"
+      - "traefik.http.routers.sade-http.rule=Host(`${APP_HOST}`)"
+      - "traefik.http.routers.sade-http.middlewares=https-redirect"
+      - "traefik.http.routers.sade-https.entrypoints=https"
+      - "traefik.http.routers.sade-https.rule=Host(`${APP_HOST}`)"
+      - "traefik.http.routers.sade-https.tls=true"
+      - "traefik.http.routers.sade-https.tls.certresolver=le"
+      - "traefik.http.routers.sade-https.tls.domains[0].main=${APP_HOST}"
+      - "traefik.http.routers.sade-https.middlewares=sade-headers"
+      - "traefik.http.middlewares.sade-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.sade-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.sade-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.sade-headers.headers.referrerPolicy=same-origin"
+      - "traefik.http.middlewares.sade-headers.headers.customResponseHeaders.X-Robots-Tag=noindex, nofollow"
+      - "traefik.http.services.sade.loadbalancer.server.port=80"
+
+networks:
+  traefik-public:
+    external: true

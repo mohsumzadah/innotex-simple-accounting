@@ -1,0 +1,75 @@
+# INNOTEX Sadə Uçot: cp .env.example .env, dəyərləri doldurun, sonra docker compose up -d --build
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sade
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d sade"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Xaricə açılmır: yalnız frontend konteyneri (nginx) /api ilə əlaqə saxlayır
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/sade
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # Fayllar artıq bazadadır; FILES_DIR yalnız hələ köçürülməmiş köhnə sətirlər üçün oxuma ehtiyatıdır
+      FILES_DIR: /data/files
+    volumes:
+      - ./data/files:/data/files:ro
+
+  # Açılışda dərhal, sonra hər gecə 02:30-da pg_dump -Fc; 30 gündən köhnə nüsxələr silinir. Nüsxələr ./backups qovluğundadır.
+  backup:
+    image: postgres:17
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: sade
+      PGUSER: ${DB_USERNAME}
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        dump() {
+          pg_dump -Fc -f /backups/sade_$$(date +%Y%m%d_%H%M).dump && find /backups -name 'sade_*.dump' -mtime +30 -delete
+        }
+        dump
+        while true; do
+          if [ "$$(date +%H%M)" = "0230" ]; then
+            dump
+            sleep 60
+          fi
+          sleep 30
+        done
+
+  # React tətbiqi + nginx; /api backend:8080-ə yönəldilir
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-8085}:80"
+
+volumes:
+  pg_data:

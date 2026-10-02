@@ -1,0 +1,27 @@
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: innotex-sade
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/sade}
+    username: ${DB_USERNAME:sade}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+
+app:
+  session-hours: 24
+  files-dir: ${FILES_DIR:./data/files}
+  admin-email: ${ADMIN_EMAIL:}
+  admin-password: ${ADMIN_PASSWORD:}
